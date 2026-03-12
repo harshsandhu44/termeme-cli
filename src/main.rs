@@ -19,6 +19,14 @@ enum Commands {
         #[arg(value_enum)]
         preset: SoundPreset,
     },
+    Hook {
+        #[arg(long)]
+        exit_code: i32,
+        #[arg(long)]
+        duration_ms: u64,
+        #[arg(long)]
+        command: String,
+    },
     Init,
     Doctor,
 }
@@ -38,6 +46,16 @@ fn main() -> Result<(), Box<dyn Error>> {
             let path = preset_path(&preset)?;
             println!("Playing {:?}: {}", preset, path.display());
             play_sound(&path)?;
+        }
+        Commands::Hook {
+            exit_code,
+            duration_ms,
+            command,
+        } => {
+            if let Some(preset) = choose_preset(&command, exit_code, duration_ms) {
+                let path = preset_path(&preset)?;
+                play_sound(&path)?;
+            }
         }
         Commands::Init => {
             init_sounds_dir()?;
@@ -71,6 +89,29 @@ fn preset_path(preset: &SoundPreset) -> Result<PathBuf, Box<dyn Error>> {
     };
 
     Ok(sounds_dir()?.join(filename))
+}
+
+fn choose_preset(command: &str, exit_code: i32, duration_ms: u64) -> Option<SoundPreset> {
+    // Ignore tiny commands so your shell doesn't chirp at every `cd` and `ls`
+    if duration_ms < 1500 {
+        return None;
+    }
+
+    let command = command.trim();
+
+    if command.starts_with("git push")
+        || command.starts_with("pnpm deploy")
+        || command.starts_with("npm publish")
+        || command.starts_with("vercel --prod")
+    {
+        return Some(SoundPreset::Deploy);
+    }
+
+    if exit_code == 0 {
+        Some(SoundPreset::Success)
+    } else {
+        Some(SoundPreset::Error)
+    }
 }
 
 fn play_sound(path: &Path) -> Result<(), Box<dyn Error>> {
