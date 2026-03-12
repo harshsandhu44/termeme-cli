@@ -2,14 +2,16 @@
 name = "termeme-cli"
 version = "0.1.0"
 edition = "2024"
+rust-version = "1.85"
+authors = ["Harsh Sandhu"]
 description = "A small CLI that plays terminal sounds for long-running commands"
 license = "MIT"
 repository = "https://github.com/harshsandhu44/termeme-cli"
 homepage = "https://github.com/harshsandhu44/termeme-cli"
 documentation = "https://docs.rs/termeme-cli"
 readme = "README.md"
-keywords = ["cli", "terminal", "audio", "productivity"]
-categories = ["command-line-utilities"]
+keywords = ["cli", "terminal", "sound", "notifications", "shell"]
+categories = ["command-line-utilities", "development-tools"]
 
 [[bin]]
 name = "termeme"
