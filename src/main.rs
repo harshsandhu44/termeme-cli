@@ -70,11 +70,7 @@ fn main() -> Result<(), Box<dyn Error>> {
             duration_ms,
             command,
         } => {
-            let config = load_config()?;
-            if let Some(preset) = choose_preset(&config, &command, exit_code, duration_ms) {
-                let path = preset_path(&preset)?;
-                play_sound(&path)?;
-            }
+            run_hook(&command, exit_code, duration_ms);
         }
         Commands::Init => {
             init_sounds_dir()?;
@@ -94,6 +90,16 @@ fn sounds_dir() -> Result<PathBuf, Box<dyn Error>> {
 
 fn config_path() -> Result<PathBuf, Box<dyn Error>> {
     Ok(sounds_dir()?.join("config.toml"))
+}
+
+fn debug_logging_enabled() -> bool {
+    matches!(env::var("TERMEME_DEBUG").as_deref(), Ok("1" | "true" | "TRUE"))
+}
+
+fn debug_log(message: &str) {
+    if debug_logging_enabled() {
+        eprintln!("termeme: {message}");
+    }
 }
 
 fn default_min_duration_ms() -> u64 {
@@ -140,6 +146,32 @@ fn load_config() -> Result<Config, Box<dyn Error>> {
     Ok(toml::from_str(&raw)?)
 }
 
+fn run_hook(command: &str, exit_code: i32, duration_ms: u64) {
+    let config = match load_config() {
+        Ok(config) => config,
+        Err(error) => {
+            debug_log(&format!("failed to load config: {error}"));
+            return;
+        }
+    };
+
+    let Some(preset) = choose_preset(&config, command, exit_code, duration_ms) else {
+        return;
+    };
+
+    let path = match preset_path(&preset) {
+        Ok(path) => path,
+        Err(error) => {
+            debug_log(&format!("failed to resolve preset path: {error}"));
+            return;
+        }
+    };
+
+    if let Err(error) = play_sound(&path) {
+        debug_log(&format!("failed to play sound: {error}"));
+    }
+}
+
 fn choose_preset(config: &Config, command: &str, exit_code: i32, duration_ms: u64) -> Option<SoundPreset> {
     // Ignore tiny commands so your shell doesn't chirp at every `cd` and `ls`
     if duration_ms < config.min_duration_ms {
@@ -161,20 +193,6 @@ fn choose_preset(config: &Config, command: &str, exit_code: i32, duration_ms: u6
     } else {
         Some(SoundPreset::Error)
     }
-}
-
-fn play_sound(path: &Path) -> Result<(), Box<dyn Error>> {
-    if !path.exists() {
-        return Err(format!("Sound file not found: {}", path.display()).into());
-    }
-
-    let status = Command::new("afplay").arg(path).status()?;
-
-    if !status.success() {
-        return Err("afplay failed to play the sound".into());
-    }
-
-    Ok(())
 }
 
 fn init_sounds_dir() -> Result<(), Box<dyn Error>> {
@@ -209,15 +227,29 @@ fn init_sounds_dir() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn command_in_path(command: &str) -> bool {
+    let Some(paths) = env::var_os("PATH") else {
+        return false;
+    };
+
+    env::split_paths(&paths).any(|dir| dir.join(command).is_file())
+}
+
 fn doctor() -> Result<(), Box<dyn Error>> {
     println!("Checking termeme setup...");
 
-    let afplay_status = Command::new("which").arg("afplay").status()?;
-    if afplay_status.success() {
-        println!("afplay is available");
-    } else {
-        println!("afplay is missing");
-    }
+    #[cfg(target_os = "macos")]
+    println!(
+        "Playback backend: afplay ({})",
+        if command_in_path("afplay") {
+            "available"
+        } else {
+            "missing"
+        }
+    );
+
+    #[cfg(not(target_os = "macos"))]
+    println!("Playback backend: unsupported on this platform");
 
     let user_dir = sounds_dir()?;
     println!("User sound directory: {}", user_dir.display());
@@ -239,4 +271,25 @@ fn doctor() -> Result<(), Box<dyn Error>> {
     }
 
     Ok(())
+}
+
+#[cfg(target_os = "macos")]
+fn play_sound(path: &Path) -> Result<(), Box<dyn Error>> {
+    if !path.exists() {
+        return Err(format!("Sound file not found: {}", path.display()).into());
+    }
+
+    let status = Command::new("afplay").arg(path).status()?;
+
+    if !status.success() {
+        return Err("afplay failed to play the sound".into());
+    }
+
+    Ok(())
+}
+
+#[cfg(not(target_os = "macos"))]
+fn play_sound(path: &Path) -> Result<(), Box<dyn Error>> {
+    let _ = path;
+    Err("sound playback is currently only supported on macOS".into())
 }
