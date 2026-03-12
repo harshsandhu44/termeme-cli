@@ -29,6 +29,12 @@ Install to your cargo bin directory:
 cargo install --path .
 ```
 
+Users can confirm the installed version with:
+
+```bash
+termeme --version
+```
+
 ## Commands
 
 Play a sound directly:
@@ -100,6 +106,27 @@ Run checks:
 ```bash
 cargo check
 cargo test
+```
+
+## Releases
+
+Versioning is managed by `release-plz` and driven by conventional commits.
+
+- `fix:` bumps the patch version
+- `feat:` bumps the minor version
+- `feat!:` or a `BREAKING CHANGE:` footer bumps the major version
+
+The release workflow runs on pushes to `main`:
+
+1. `release-plz` opens or updates a release PR with the next version and changelog.
+2. Merging that PR creates the git tag and GitHub release.
+3. If `CARGO_REGISTRY_TOKEN` is configured in GitHub Actions secrets, the crate can also be published to crates.io.
+
+Local preview commands:
+
+```bash
+cargo install release-plz
+release-plz release-pr --config release-plz.toml
 ```
 
 Current module layout:
