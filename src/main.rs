@@ -1,6 +1,8 @@
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
+use std::env;
 use std::error::Error;
-use std::path::Path;
+use std::fs;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 #[derive(Parser)]
@@ -14,42 +16,66 @@ struct Cli {
 #[derive(Subcommand)]
 enum Commands {
     Play {
-        path: String,
+        #[arg(value_enum)]
+        preset: SoundPreset,
     },
     Init,
     Doctor,
+}
+
+#[derive(ValueEnum, Clone, Debug)]
+enum SoundPreset {
+    Success,
+    Error,
+    Deploy,
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Play { path } => {
+        Commands::Play { preset } => {
+            let path = preset_path(&preset)?;
+            println!("Playing {:?}: {}", preset, path.display());
             play_sound(&path)?;
         }
         Commands::Init => {
-            println!("Initializing termeme...");
+            init_sounds_dir()?;
         }
         Commands::Doctor => {
-            println!("Checking termsound setup...");
-
-            let status = Command::new("which").arg("afplay").status()?;
-
-            if status.success() {
-                println!("afplay is available");
-            } else {
-                println!("afplay is missing");
-            }
+            doctor()?;
         }
     }
 
     Ok(())
 }
 
-fn play_sound(path: &str) -> Result<(), Box<dyn Error>> {
-    if !Path::new(path).exists() {
-        println!("{}", path);
-        return Err(format!("Sound file not found: {}", path).into());
+fn sounds_dir() -> Result<PathBuf, Box<dyn Error>> {
+    let home = env::var("HOME")?;
+    Ok(PathBuf::from(home).join(".termeme"))
+}
+
+fn repo_assets_dir() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("assets")
+}
+
+fn repo_asset_path(filename: &str) -> PathBuf {
+    repo_assets_dir().join(filename)
+}
+
+fn preset_path(preset: &SoundPreset) -> Result<PathBuf, Box<dyn Error>> {
+    let filename = match preset {
+        SoundPreset::Success => "success.wav",
+        SoundPreset::Error => "error.wav",
+        SoundPreset::Deploy => "deploy.wav",
+    };
+
+    Ok(sounds_dir()?.join(filename))
+}
+
+fn play_sound(path: &Path) -> Result<(), Box<dyn Error>> {
+    if !path.exists() {
+        return Err(format!("Sound file not found: {}", path.display()).into());
     }
 
     let status = Command::new("afplay").arg(path).status()?;
@@ -61,3 +87,58 @@ fn play_sound(path: &str) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+fn init_sounds_dir() -> Result<(), Box<dyn Error>> {
+    let target_dir = sounds_dir()?;
+    fs::create_dir_all(&target_dir)?;
+
+    for file in ["success.wav", "error.wav", "deploy.wav"] {
+        let source = repo_asset_path(file);
+        let target = target_dir.join(file);
+
+        if !source.exists() {
+            eprintln!("Missing repo asset: {}", source.display());
+            continue;
+        }
+
+        if target.exists() {
+            println!("Skipped {}, already exists", file);
+        } else {
+            fs::copy(&source, &target)?;
+            println!("Copied {}", file);
+        }
+    }
+
+    println!("Sound directory ready: {}", target_dir.display());
+    Ok(())
+}
+
+fn doctor() -> Result<(), Box<dyn Error>> {
+    println!("Checking termeme setup...");
+
+    let afplay_status = Command::new("which").arg("afplay").status()?;
+    if afplay_status.success() {
+        println!("afplay is available");
+    } else {
+        println!("afplay is missing");
+    }
+
+    let repo_dir = repo_assets_dir();
+    println!("Repo assets directory: {}", repo_dir.display());
+
+    let user_dir = sounds_dir()?;
+    println!("User sound directory: {}", user_dir.display());
+
+    for file in ["success.wav", "error.wav", "deploy.wav"] {
+        let repo_file = repo_dir.join(file);
+        let user_file = user_dir.join(file);
+
+        println!(
+            "{} -> repo: {}, user: {}",
+            file,
+            if repo_file.exists() { "found" } else { "missing" },
+            if user_file.exists() { "found" } else { "missing" }
+        );
+    }
+
+    Ok(())
+}
