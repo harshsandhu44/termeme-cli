@@ -11,6 +11,10 @@ readme = "README.md"
 keywords = ["cli", "terminal", "audio", "productivity"]
 categories = ["command-line-utilities"]
 
+[[bin]]
+name = "termeme"
+path = "src/main.rs"
+
 [dependencies]
 clap = { version = "4", features = ["derive"] }
 serde = { version = "1", features = ["derive"] }
