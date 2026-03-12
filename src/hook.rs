@@ -1,5 +1,5 @@
 use crate::config::Config;
-use crate::SoundPreset;
+use crate::sound::SoundPreset;
 
 pub fn choose_preset(
     config: &Config,
@@ -32,7 +32,7 @@ pub fn choose_preset(
 mod tests {
     use super::choose_preset;
     use crate::config::Config;
-    use crate::SoundPreset;
+    use crate::sound::SoundPreset;
 
     fn test_config() -> Config {
         Config::default()
