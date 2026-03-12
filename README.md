@@ -29,6 +29,11 @@ Install to your cargo bin directory:
 cargo install --path .
 ```
 
+Release builds are attached to GitHub Releases as macOS tarballs:
+
+- `termeme-<version>-x86_64-apple-darwin.tar.gz`
+- `termeme-<version>-aarch64-apple-darwin.tar.gz`
+
 Users can confirm the installed version with:
 
 ```bash
@@ -120,7 +125,7 @@ The release workflow runs on pushes to `main`:
 
 1. `release-plz` opens or updates a release PR with the next version and changelog.
 2. Merging that PR creates the git tag and GitHub release.
-3. If `CARGO_REGISTRY_TOKEN` is configured in GitHub Actions secrets, the crate can also be published to crates.io.
+3. The release asset workflow builds macOS binaries and uploads tarballs plus SHA-256 checksum files to that release.
 
 Local preview commands:
 
