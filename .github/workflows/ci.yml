@@ -21,3 +21,6 @@ jobs:
 
       - name: Run cargo test
         run: cargo test --locked
+
+      - name: Run cargo build --release
+        run: cargo build --release --locked
