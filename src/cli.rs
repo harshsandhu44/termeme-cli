@@ -4,6 +4,7 @@ use clap::{Parser, Subcommand};
 #[derive(Parser)]
 #[command(name = "termeme")]
 #[command(about = "Play terminal sounds for events and commands")]
+#[command(version)]
 pub struct Cli {
     #[command(subcommand)]
     pub command: Commands,
