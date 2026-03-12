@@ -1,5 +1,9 @@
+mod config;
+mod hook;
+
 use clap::{Parser, Subcommand, ValueEnum};
-use serde::{Deserialize, Serialize};
+use config::{config_path, load_config, serialize_default_config};
+use hook::choose_preset;
 use std::env;
 use std::error::Error;
 use std::fs;
@@ -39,23 +43,6 @@ enum SoundPreset {
     Deploy,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct Config {
-    #[serde(default = "default_min_duration_ms")]
-    min_duration_ms: u64,
-    #[serde(default = "default_deploy_command_prefixes")]
-    deploy_command_prefixes: Vec<String>,
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            min_duration_ms: default_min_duration_ms(),
-            deploy_command_prefixes: default_deploy_command_prefixes(),
-        }
-    }
-}
-
 fn main() -> Result<(), Box<dyn Error>> {
     let cli = Cli::parse();
 
@@ -88,10 +75,6 @@ fn sounds_dir() -> Result<PathBuf, Box<dyn Error>> {
     Ok(PathBuf::from(home).join(".termeme"))
 }
 
-fn config_path() -> Result<PathBuf, Box<dyn Error>> {
-    Ok(sounds_dir()?.join("config.toml"))
-}
-
 fn debug_logging_enabled() -> bool {
     matches!(env::var("TERMEME_DEBUG").as_deref(), Ok("1" | "true" | "TRUE"))
 }
@@ -100,19 +83,6 @@ fn debug_log(message: &str) {
     if debug_logging_enabled() {
         eprintln!("termeme: {message}");
     }
-}
-
-fn default_min_duration_ms() -> u64 {
-    1500
-}
-
-fn default_deploy_command_prefixes() -> Vec<String> {
-    vec![
-        "git push".to_string(),
-        "pnpm deploy".to_string(),
-        "npm publish".to_string(),
-        "vercel --prod".to_string(),
-    ]
 }
 
 fn preset_filename(preset: &SoundPreset) -> &'static str {
@@ -136,18 +106,16 @@ fn preset_path(preset: &SoundPreset) -> Result<PathBuf, Box<dyn Error>> {
     Ok(sounds_dir()?.join(preset_filename(preset)))
 }
 
-fn load_config() -> Result<Config, Box<dyn Error>> {
-    let path = config_path()?;
-    if !path.exists() {
-        return Ok(Config::default());
-    }
-
-    let raw = fs::read_to_string(&path)?;
-    Ok(toml::from_str(&raw)?)
-}
-
 fn run_hook(command: &str, exit_code: i32, duration_ms: u64) {
-    let config = match load_config() {
+    let sounds_dir = match sounds_dir() {
+        Ok(path) => path,
+        Err(error) => {
+            debug_log(&format!("failed to resolve sounds dir: {error}"));
+            return;
+        }
+    };
+
+    let config = match load_config(&sounds_dir) {
         Ok(config) => config,
         Err(error) => {
             debug_log(&format!("failed to load config: {error}"));
@@ -172,29 +140,6 @@ fn run_hook(command: &str, exit_code: i32, duration_ms: u64) {
     }
 }
 
-fn choose_preset(config: &Config, command: &str, exit_code: i32, duration_ms: u64) -> Option<SoundPreset> {
-    // Ignore tiny commands so your shell doesn't chirp at every `cd` and `ls`
-    if duration_ms < config.min_duration_ms {
-        return None;
-    }
-
-    let command = command.trim();
-
-    if config
-        .deploy_command_prefixes
-        .iter()
-        .any(|prefix| command.starts_with(prefix))
-    {
-        return Some(SoundPreset::Deploy);
-    }
-
-    if exit_code == 0 {
-        Some(SoundPreset::Success)
-    } else {
-        Some(SoundPreset::Error)
-    }
-}
-
 fn init_sounds_dir() -> Result<(), Box<dyn Error>> {
     let target_dir = sounds_dir()?;
     fs::create_dir_all(&target_dir)?;
@@ -214,11 +159,11 @@ fn init_sounds_dir() -> Result<(), Box<dyn Error>> {
         }
     }
 
-    let config_path = config_path()?;
+    let config_path = config_path(&target_dir);
     if config_path.exists() {
         println!("Skipped config.toml, already exists");
     } else {
-        let default_config = toml::to_string_pretty(&Config::default())?;
+        let default_config = serialize_default_config()?;
         fs::write(&config_path, default_config)?;
         println!("Created config.toml");
     }
@@ -253,7 +198,7 @@ fn doctor() -> Result<(), Box<dyn Error>> {
 
     let user_dir = sounds_dir()?;
     println!("User sound directory: {}", user_dir.display());
-    println!("Config file: {}", config_path()?.display());
+    println!("Config file: {}", config_path(&user_dir).display());
 
     for file in ["success.wav", "error.wav", "deploy.wav"] {
         let user_file = user_dir.join(file);
@@ -292,47 +237,4 @@ fn play_sound(path: &Path) -> Result<(), Box<dyn Error>> {
 fn play_sound(path: &Path) -> Result<(), Box<dyn Error>> {
     let _ = path;
     Err("sound playback is currently only supported on macOS".into())
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{choose_preset, Config, SoundPreset};
-
-    fn test_config() -> Config {
-        Config::default()
-    }
-
-    #[test]
-    fn ignores_short_commands() {
-        let preset = choose_preset(&test_config(), "cargo fmt", 0, 500);
-        assert_eq!(preset, None);
-    }
-
-    #[test]
-    fn uses_deploy_sound_for_matching_prefix() {
-        let preset = choose_preset(&test_config(), "git push origin main", 0, 3_000);
-        assert_eq!(preset, Some(SoundPreset::Deploy));
-    }
-
-    #[test]
-    fn uses_success_sound_for_non_deploy_success() {
-        let preset = choose_preset(&test_config(), "cargo test", 0, 3_000);
-        assert_eq!(preset, Some(SoundPreset::Success));
-    }
-
-    #[test]
-    fn uses_error_sound_for_failed_commands() {
-        let preset = choose_preset(&test_config(), "cargo test", 1, 3_000);
-        assert_eq!(preset, Some(SoundPreset::Error));
-    }
-
-    #[test]
-    fn supports_custom_deploy_prefixes() {
-        let config = Config {
-            min_duration_ms: 100,
-            deploy_command_prefixes: vec!["my-release".to_string()],
-        };
-        let preset = choose_preset(&config, "my-release staging", 0, 2_000);
-        assert_eq!(preset, Some(SoundPreset::Deploy));
-    }
 }
