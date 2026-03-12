@@ -124,8 +124,12 @@ Versioning is managed by `release-plz` and driven by conventional commits.
 The release workflow runs on pushes to `main`:
 
 1. `release-plz` opens or updates a release PR with the next version and changelog.
-2. Merging that PR creates the git tag and GitHub release.
+2. Merging that release PR creates the git tag and GitHub release.
 3. The release asset workflow builds macOS binaries and uploads tarballs plus SHA-256 checksum files to that release.
+
+GitHub repository setup required:
+
+- In `Settings > Actions > General`, enable `Allow GitHub Actions to create and approve pull requests` so the `release-plz` PR job can open the release PR.
 
 Local preview commands:
 

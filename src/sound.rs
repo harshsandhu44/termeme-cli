@@ -131,6 +131,7 @@ fn bundled_asset_bytes(filename: &str) -> Option<&'static [u8]> {
     }
 }
 
+#[cfg(target_os = "macos")]
 fn command_in_path(command: &str) -> bool {
     let Some(paths) = env::var_os("PATH") else {
         return false;

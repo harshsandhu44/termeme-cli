@@ -2,8 +2,10 @@
 features_always_increment_minor = true
 git_release_enable = true
 pr_labels = ["release"]
+release_always = false
 repo_url = "https://github.com/harshsandhu44/termeme-cli"
 
 [[package]]
 name = "termeme-cli"
 changelog_path = "CHANGELOG.md"
+publish = false
