@@ -29,6 +29,17 @@ Install to your cargo bin directory:
 cargo install --path .
 ```
 
+Release builds are attached to GitHub Releases as macOS tarballs:
+
+- `termeme-<version>-x86_64-apple-darwin.tar.gz`
+- `termeme-<version>-aarch64-apple-darwin.tar.gz`
+
+Users can confirm the installed version with:
+
+```bash
+termeme --version
+```
+
 ## Commands
 
 Play a sound directly:
@@ -100,6 +111,27 @@ Run checks:
 ```bash
 cargo check
 cargo test
+```
+
+## Releases
+
+Versioning is managed by `release-plz` and driven by conventional commits.
+
+- `fix:` bumps the patch version
+- `feat:` bumps the minor version
+- `feat!:` or a `BREAKING CHANGE:` footer bumps the major version
+
+The release workflow runs on pushes to `main`:
+
+1. `release-plz` opens or updates a release PR with the next version and changelog.
+2. Merging that PR creates the git tag and GitHub release.
+3. The release asset workflow builds macOS binaries and uploads tarballs plus SHA-256 checksum files to that release.
+
+Local preview commands:
+
+```bash
+cargo install release-plz
+release-plz release-pr --config release-plz.toml
 ```
 
 Current module layout:

@@ -1,0 +1,49 @@
+name: Release Assets
+
+on:
+  release:
+    types:
+      - published
+
+jobs:
+  build-macos:
+    name: Build macOS binary
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-13
+            target: x86_64-apple-darwin
+          - runner: macos-14
+            target: aarch64-apple-darwin
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Build release binary
+        run: cargo build --locked --release --target ${{ matrix.target }}
+
+      - name: Package archive
+        run: |
+          mkdir -p dist
+          cp target/${{ matrix.target }}/release/termeme dist/termeme
+          tar -C dist -czf termeme-${{ github.event.release.tag_name }}-${{ matrix.target }}.tar.gz termeme
+
+      - name: Generate checksum
+        run: shasum -a 256 termeme-${{ github.event.release.tag_name }}-${{ matrix.target }}.tar.gz > termeme-${{ github.event.release.tag_name }}-${{ matrix.target }}.tar.gz.sha256
+
+      - name: Upload release assets
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload ${{ github.event.release.tag_name }} \
+            termeme-${{ github.event.release.tag_name }}-${{ matrix.target }}.tar.gz \
+            termeme-${{ github.event.release.tag_name }}-${{ matrix.target }}.tar.gz.sha256

@@ -4,8 +4,16 @@ version = "0.1.0"
 edition = "2024"
 description = "A small CLI that plays terminal sounds for long-running commands"
 license = "MIT"
+repository = "https://github.com/harshsandhu44/termeme-cli"
+homepage = "https://github.com/harshsandhu44/termeme-cli"
+documentation = "https://docs.rs/termeme-cli"
+readme = "README.md"
 keywords = ["cli", "terminal", "audio", "productivity"]
 categories = ["command-line-utilities"]
+
+[[bin]]
+name = "termeme"
+path = "src/main.rs"
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }
