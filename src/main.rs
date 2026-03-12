@@ -32,7 +32,7 @@ enum Commands {
     Doctor,
 }
 
-#[derive(ValueEnum, Clone, Debug)]
+#[derive(ValueEnum, Clone, Debug, PartialEq, Eq)]
 enum SoundPreset {
     Success,
     Error,
@@ -292,4 +292,47 @@ fn play_sound(path: &Path) -> Result<(), Box<dyn Error>> {
 fn play_sound(path: &Path) -> Result<(), Box<dyn Error>> {
     let _ = path;
     Err("sound playback is currently only supported on macOS".into())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{choose_preset, Config, SoundPreset};
+
+    fn test_config() -> Config {
+        Config::default()
+    }
+
+    #[test]
+    fn ignores_short_commands() {
+        let preset = choose_preset(&test_config(), "cargo fmt", 0, 500);
+        assert_eq!(preset, None);
+    }
+
+    #[test]
+    fn uses_deploy_sound_for_matching_prefix() {
+        let preset = choose_preset(&test_config(), "git push origin main", 0, 3_000);
+        assert_eq!(preset, Some(SoundPreset::Deploy));
+    }
+
+    #[test]
+    fn uses_success_sound_for_non_deploy_success() {
+        let preset = choose_preset(&test_config(), "cargo test", 0, 3_000);
+        assert_eq!(preset, Some(SoundPreset::Success));
+    }
+
+    #[test]
+    fn uses_error_sound_for_failed_commands() {
+        let preset = choose_preset(&test_config(), "cargo test", 1, 3_000);
+        assert_eq!(preset, Some(SoundPreset::Error));
+    }
+
+    #[test]
+    fn supports_custom_deploy_prefixes() {
+        let config = Config {
+            min_duration_ms: 100,
+            deploy_command_prefixes: vec!["my-release".to_string()],
+        };
+        let preset = choose_preset(&config, "my-release staging", 0, 2_000);
+        assert_eq!(preset, Some(SoundPreset::Deploy));
+    }
 }

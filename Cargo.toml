@@ -2,6 +2,10 @@
 name = "termeme-cli"
 version = "0.1.0"
 edition = "2024"
+description = "A small CLI that plays terminal sounds for long-running commands"
+license = "MIT"
+keywords = ["cli", "terminal", "audio", "productivity"]
+categories = ["command-line-utilities"]
 
 [dependencies]
 clap = { version = "4", features = ["derive"] }
